@@ -1,0 +1,320 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using LabsProvisioning.Model;
+using Microsoft.Azure.Management.Compute.Fluent.Models;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
+using Microsoft.Azure.Management.ResourceManager.Fluent;
+using Microsoft.Azure.Management.Fluent;
+using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
+using Microsoft.Azure.Management.Network.Fluent;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json.Linq;
+using System.Reflection;
+using System.Net;
+using Microsoft.Azure.Management.Compute.Fluent;
+
+namespace LabsProvisioning
+{
+    public static class LabsProvision
+    {
+        [FunctionName("LabsProvision")]
+        public static async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
+            ILogger log)
+        {
+            log.LogInformation("Start of Provisioning");
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            LabsProvisionModel labsProvision = JsonConvert.DeserializeObject<LabsProvisionModel>(requestBody);
+
+            if (string.IsNullOrEmpty(labsProvision.SubscriptionId) ||
+                string.IsNullOrEmpty(labsProvision.TenantId) ||
+                string.IsNullOrEmpty(labsProvision.ApplicationId) ||
+                string.IsNullOrEmpty(labsProvision.ApplicationKey) ||
+                string.IsNullOrEmpty(labsProvision.Location) ||
+                string.IsNullOrEmpty(labsProvision.Environment) ||
+                string.IsNullOrEmpty(labsProvision.ClientCode) ||
+                //string.IsNullOrEmpty(labsProvision.VirtualMachineName) ||
+                string.IsNullOrEmpty(labsProvision.Size) ||
+                string.IsNullOrEmpty(labsProvision.ImageUri) ||
+                string.IsNullOrEmpty(labsProvision.ContactPerson) ||
+                string.IsNullOrEmpty(labsProvision.StorageAccountName) ||
+                string.IsNullOrEmpty(labsProvision.OsType) ||
+                string.IsNullOrEmpty(labsProvision.ComputerName) ||
+                string.IsNullOrEmpty(labsProvision.Username) ||
+                string.IsNullOrEmpty(labsProvision.Password)) 
+            {
+                log.LogInformation("Incorect Request Body.");
+
+                return new BadRequestObjectResult(
+                    JsonConvert.SerializeObject(new
+                    {
+                        message = "Incorect Request Body.",
+                        requestBody = JsonConvert.SerializeObject(labsProvision)
+                    })
+                );
+            }
+
+            string subscriptionId           = labsProvision.SubscriptionId;
+            string tenantId                 = labsProvision.TenantId;
+            string applicationId            = labsProvision.ApplicationId;
+            string applicationKey           = labsProvision.ApplicationKey;
+
+            string environment              = labsProvision.Environment;
+            string clientCode               = labsProvision.ClientCode;
+
+            string location                 = labsProvision.Location;
+            string virtualMachineName       = labsProvision.VirtualMachineName.ToUpper();
+            string size                     = labsProvision.Size;
+            int tempStorageSizeInGb         = labsProvision.TempStorageSizeInGb;
+            string imageUri                 = labsProvision.ImageUri;
+            string contactPerson            = labsProvision.ContactPerson;
+            string storageAccountName       = labsProvision.StorageAccountName;
+            string osType                   = labsProvision.OsType;
+            string computerName             = labsProvision.ComputerName;
+            string username                 = labsProvision.Username;
+            string password                 = labsProvision.Password;
+
+            bool isTenant                   = labsProvision.IsCustomTemplate;
+            bool deallocateWhenFinish       = labsProvision.DeallocateWhenFinish;
+
+
+            try {
+                ServicePrincipalLoginInformation principalLogIn     = new ServicePrincipalLoginInformation();
+                principalLogIn.ClientId                             = applicationId;
+                principalLogIn.ClientSecret                         = applicationKey;
+
+                AzureEnvironment azureEnvironment = AzureEnvironment.AzureGlobalCloud;
+                AzureCredentials credentials = new AzureCredentials(principalLogIn, tenantId, azureEnvironment);
+
+                IAzure _azure = Azure.Configure()
+                      .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                      .Authenticate(credentials)
+                      .WithSubscription(subscriptionId);
+
+                log.LogInformation(_azure.GetCurrentSubscription().SubscriptionId);
+
+                log.LogInformation("Getting labs dependencies");
+                string resourceGroupName        = $"cs-{clientCode}-{environment}-rgrp".ToUpper();
+                string networkSecurityGroupName = $"cs-{clientCode}-{environment}-nsg".ToUpper();
+                string virtualNetworkName       = $"cs-{clientCode}-{environment}-vnet".ToUpper();
+
+                log.LogInformation("Setting up tags");
+
+                object rgTags = new
+                {
+                    _business_name  = "cs",
+                    _azure_region   = location,
+                    _contact_person = contactPerson,
+                    _client_code    = clientCode,
+                    _environment    = environment,
+                    _lab_type       = "virtualmachine",
+                    _created        = DateTime.Now.ToShortDateString(),
+                };
+
+                string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
+
+                log.LogInformation("Getting labs resource dependencies");
+                string vnetId               = _azure.Networks.GetByResourceGroup(resourceGroupName, virtualNetworkName).Id.ToString();
+                string nsgId                = _azure.NetworkSecurityGroups.GetByResourceGroup(resourceGroupName, networkSecurityGroupName).Id.ToString();
+                INetwork virtualNetwork     = _azure.Networks.GetById(vnetId);
+
+                string publicIpAddressType  = virtualNetwork.Inner.Subnets[0].NatGateway == null ? "Dynamic" : "Static";
+                string publicIpAddressSku   = virtualNetwork.Inner.Subnets[0].NatGateway == null ? "Basic" : "Standard";
+
+                if (string.IsNullOrEmpty(virtualMachineName)) {
+                    virtualMachineName = $"cs-{clientCode}-{environment}-VM-{uniqueId}".ToUpper();
+                }
+
+                log.LogInformation("Getting labs resource group name");
+
+                string labsResourceGroupName = await SetResourceGroupAsync(_azure, credentials, subscriptionId, location, environment, clientCode, contactPerson);
+
+                Stream stream = new MemoryStream(Properties.Resources.templateVm);
+                JObject templateParameterObjectVirtualMachine = new JObject();
+                StreamReader template = new StreamReader(stream);
+                JsonTextReader reader = new JsonTextReader(template);
+
+                templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
+
+                templateParameterObjectVirtualMachine.SelectToken("parameters.location")["defaultValue"] = location;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.networkSecurityGroupId")["defaultValue"] = nsgId;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.subnetName")["defaultValue"] = "virtual-machines-labs-subnet";
+                templateParameterObjectVirtualMachine.SelectToken("parameters.virtualNetworkId")["defaultValue"] = vnetId;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.virtualMachineName")["defaultValue"] = virtualMachineName;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.computerName")["defaultValue"] = computerName;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.storageAccountName")["defaultValue"] = storageAccountName;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.publicIpAddressType")["defaultValue"] = publicIpAddressType;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.publicIpAddressSku")["defaultValue"] = publicIpAddressSku;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.virtualMachineSize")["defaultValue"] = size;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.adminUsername")["defaultValue"] = username;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.adminPassword")["defaultValue"] = password;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.newTemplateName")["defaultValue"] = virtualMachineName;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.imageUri")["defaultValue"] = imageUri;
+                templateParameterObjectVirtualMachine.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
+                templateParameterObjectVirtualMachine.SelectToken("parameters.diskSizeGB")["defaultValue"] = tempStorageSizeInGb;
+
+                string deploymentName = $"virtual-machine-{uniqueId}".ToLower();
+                log.LogInformation($"Deploying virtual-machine-{uniqueId}".ToLower());
+
+                IDeployment vmDeployment = _azure.Deployments.Define(deploymentName)
+                    .WithExistingResourceGroup(labsResourceGroupName)
+                    .WithTemplate(templateParameterObjectVirtualMachine)
+                    .WithParameters("{}")
+                    .WithMode(Microsoft.Azure.Management.ResourceManager.Fluent.Models.DeploymentMode.Incremental)
+                    .Create();
+
+
+                if (vmDeployment.ProvisioningState.Value == ProvisioningState.Failed.Value)
+                {
+                    log.LogInformation("End of Provisioning");
+                    log.LogError("Deployment Failed");
+                    return new BadRequestObjectResult(
+                        JsonConvert.SerializeObject(new
+                        {
+                            message = JsonConvert.SerializeObject("Deployment Failed")
+                        })
+                    );
+                }
+
+
+                log.LogInformation($"Deployment virtual-machine-{uniqueId} is done");
+
+                stream = new MemoryStream(Properties.Resources.windows_template_custom_extension);
+                JObject templateParameterObjectCustomExtension = new JObject();
+                template = new StreamReader(stream);
+                reader = new JsonTextReader(template);
+
+                templateParameterObjectCustomExtension = (JObject)JToken.ReadFrom(reader);
+
+
+                templateParameterObjectCustomExtension.SelectToken("parameters.vmName")["defaultValue"] = virtualMachineName;
+                templateParameterObjectCustomExtension.SelectToken("parameters.location")["defaultValue"] = location;
+                templateParameterObjectCustomExtension.SelectToken("parameters.fileUris")["defaultValue"] = "https://raw.githubusercontent.com/onecliquezone/create-sysenv/main/create-environment-variables-windows.ps1";
+
+
+                templateParameterObjectCustomExtension.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {clientCode} -Fqdn {virtualMachineName}";
+
+                deploymentName = $"virtual-machine-extension-{uniqueId}".ToLower();
+                log.LogInformation($"Deploying virtual-machine-extension-{uniqueId}");
+                
+                log.LogInformation("Setting up system environment");
+
+                IDeployment vmExtensionDeployment = _azure.Deployments.Define(deploymentName)
+                    .WithExistingResourceGroup(labsResourceGroupName)
+                    .WithTemplate(templateParameterObjectCustomExtension)
+                    .WithParameters("{}")
+                    .WithMode(Microsoft.Azure.Management.ResourceManager.Fluent.Models.DeploymentMode.Incremental)
+                    .Create();
+
+                log.LogInformation(vmExtensionDeployment.ProvisioningState.Value);
+
+                if (vmExtensionDeployment.ProvisioningState.Value == ProvisioningState.Failed.Value)
+                {
+                    log.LogInformation("End of Provisioning");
+                    log.LogError("System environment Deployment Failed");
+                    return new BadRequestObjectResult(
+                        JsonConvert.SerializeObject(new
+                        {
+                            message = JsonConvert.SerializeObject("System environment Deployment Failed")
+                        })
+                    );
+                }
+                log.LogInformation($"Deallocate when done: {deallocateWhenFinish}");
+                if (deallocateWhenFinish) {
+                    try
+                    {
+                        log.LogInformation($"Deallocating {virtualMachineName}");
+                        IVirtualMachine virtualMachine = _azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName);
+                        virtualMachine.Deallocate();
+                        log.LogInformation(_azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName).PowerState.Value);
+                        log.LogInformation("End of Provisioning");
+
+                        return new OkObjectResult(vmDeployment.Outputs);
+                    }
+                    catch (Exception e)
+                    {
+
+                        log.LogError(e.Message);
+                        log.LogError("End of Provisioning");
+
+                        return new BadRequestObjectResult(e.Message);
+                    }
+                }
+
+                log.LogInformation("End of Provisioning");
+
+                return new OkObjectResult(vmDeployment.Outputs);
+
+
+            }
+            catch (Exception e)
+            {
+                log.LogError(e.Message);
+                return new BadRequestObjectResult(
+                    JsonConvert.SerializeObject(new
+                    {
+                        message = JsonConvert.SerializeObject(e.Message)
+                    })
+                );
+            }
+        }
+
+        public static async Task<string> SetResourceGroupAsync(IAzure _azure, AzureCredentials credentials, string subscriptionId, string location, string environment, string clientCode, string contactPerson, int maxRgLimit = 50, int maxResources = 750)
+        {
+            IDictionary<string, string> rgTags = new Dictionary<string, string>();
+
+            rgTags.Add("_business_name", "cs");
+            rgTags.Add("_azure_region", location);
+            rgTags.Add("_contact_person", contactPerson);
+            rgTags.Add("_client_code", clientCode.ToUpper());
+            rgTags.Add("_environment", environment.ToUpper());
+
+            string resourceGroupName = string.Empty;
+
+            RestClient _restClient = RestClient
+                  .Configure()
+                  .WithEnvironment(AzureEnvironment.AzureGlobalCloud)
+                  .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
+                  .WithCredentials(credentials)
+                  .Build();
+
+            for (int i = 1; i <= maxRgLimit; i++) {
+                resourceGroupName = $"cs-{clientCode}{i}-{environment}-rgrp".ToUpper();
+                try
+                {
+                    IResourceGroup resourceGroup = _azure.ResourceGroups.GetByName(resourceGroupName);
+                }
+                catch 
+                {
+                    _azure.ResourceGroups.Define(resourceGroupName)
+                        .WithRegion(location)
+                        .WithTags(rgTags)
+                        .Create();
+                }
+                
+                ResourceManagementClient resourceManagementClient = new ResourceManagementClient(_restClient)
+                {
+                    SubscriptionId = subscriptionId
+                };
+
+                int resourceCount = (await resourceManagementClient.Resources.ListByResourceGroupAsync(resourceGroupName)).ToList().Count;
+
+                if (resourceCount <= maxResources) {
+                    break;
+                }
+
+            }
+
+            return resourceGroupName;
+        }
+
+    }
+}
