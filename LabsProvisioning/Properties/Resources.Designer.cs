@@ -63,6 +63,46 @@ namespace LabsProvisioning.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] app_insight {
+            get {
+                object obj = ResourceManager.GetObject("app_insight", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] azuredeploy_network {
+            get {
+                object obj = ResourceManager.GetObject("azuredeploy_network", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] forcestop_dailyreport {
+            get {
+                object obj = ResourceManager.GetObject("forcestop_dailyreport", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] nsg_web_app_network {
+            get {
+                object obj = ResourceManager.GetObject("nsg_web_app_network", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] parameterVm {
             get {
                 object obj = ResourceManager.GetObject("parameterVm", resourceCulture);

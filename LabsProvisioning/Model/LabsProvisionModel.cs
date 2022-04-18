@@ -40,7 +40,11 @@ namespace LabsProvisioning.Model
 
         public string TenantId { get; set; }
 
-        public bool DeallocateWhenFinish { get; set; }
+        public bool DeallocateWhenFinish { get; set; } = true;
+
+        public string Fqdn { get; set; }
+
+        public string apiprefix { get; set; }
 
     }
 }

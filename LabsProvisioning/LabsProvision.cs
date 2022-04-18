@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Net;
 using Microsoft.Azure.Management.Compute.Fluent;
 
+
 namespace LabsProvisioning
 {
     public static class LabsProvision
@@ -49,7 +50,8 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.OsType) ||
                 string.IsNullOrEmpty(labsProvision.ComputerName) ||
                 string.IsNullOrEmpty(labsProvision.Username) ||
-                string.IsNullOrEmpty(labsProvision.Password)) 
+                string.IsNullOrEmpty(labsProvision.Password) ||
+                string.IsNullOrEmpty(labsProvision.Fqdn)) 
             {
                 log.LogInformation("Incorect Request Body.");
 
@@ -82,9 +84,13 @@ namespace LabsProvisioning
             string username                 = labsProvision.Username;
             string password                 = labsProvision.Password;
 
+            string fqdn                     = labsProvision.Fqdn;
+            string apiprefix                = labsProvision.apiprefix;
+
             bool isTenant                   = labsProvision.IsCustomTemplate;
             bool deallocateWhenFinish       = labsProvision.DeallocateWhenFinish;
 
+            string createEnvironmentVariablesPsUrl = ResourceHelper.GetEnvironmentVariable("CreateEnvironmentVariablesPsUrl");
 
             try {
                 ServicePrincipalLoginInformation principalLogIn     = new ServicePrincipalLoginInformation();
@@ -93,6 +99,33 @@ namespace LabsProvisioning
 
                 AzureEnvironment azureEnvironment = AzureEnvironment.AzureGlobalCloud;
                 AzureCredentials credentials = new AzureCredentials(principalLogIn, tenantId, azureEnvironment);
+
+                string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
+
+                if (string.IsNullOrEmpty(virtualMachineName))
+                {
+                    log.LogInformation("virtualMachineName parameter is empty.");
+                    log.LogInformation("Generating virtualMachineName");
+                    virtualMachineName = $"cs-{clientCode}-{environment}-VM-{uniqueId}".ToUpper();
+                    log.LogInformation($"virtualMachineName: {virtualMachineName}");
+                }
+
+                log.LogInformation($"subscriptionId: {subscriptionId}");
+                log.LogInformation($"tenantId: {tenantId}");
+                log.LogInformation($"applicationId: {applicationId}");
+                log.LogInformation($"environment: {environment}");
+                log.LogInformation($"clientCode: {clientCode}");
+                log.LogInformation($"location: {location}");
+                log.LogInformation($"virtualMachineName: {virtualMachineName}");
+                log.LogInformation($"size: {size}");
+                log.LogInformation($"tempStorageSizeInGb: {tempStorageSizeInGb}");
+                log.LogInformation($"imageUri: {imageUri}");
+                log.LogInformation($"storageAccountName: {storageAccountName}");
+                log.LogInformation($"osType: {osType}");
+                log.LogInformation($"computerName: {computerName}");
+                log.LogInformation($"username: {username}");
+                log.LogInformation($"password: {password}");
+
 
                 IAzure _azure = Azure.Configure()
                       .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
@@ -119,7 +152,6 @@ namespace LabsProvisioning
                     _created        = DateTime.Now.ToShortDateString(),
                 };
 
-                string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
 
                 log.LogInformation("Getting labs resource dependencies");
                 string vnetId               = _azure.Networks.GetByResourceGroup(resourceGroupName, virtualNetworkName).Id.ToString();
@@ -128,10 +160,6 @@ namespace LabsProvisioning
 
                 string publicIpAddressType  = virtualNetwork.Inner.Subnets[0].NatGateway == null ? "Dynamic" : "Static";
                 string publicIpAddressSku   = virtualNetwork.Inner.Subnets[0].NatGateway == null ? "Basic" : "Standard";
-
-                if (string.IsNullOrEmpty(virtualMachineName)) {
-                    virtualMachineName = $"cs-{clientCode}-{environment}-VM-{uniqueId}".ToUpper();
-                }
 
                 log.LogInformation("Getting labs resource group name");
 
@@ -197,10 +225,8 @@ namespace LabsProvisioning
 
                 templateParameterObjectCustomExtension.SelectToken("parameters.vmName")["defaultValue"] = virtualMachineName;
                 templateParameterObjectCustomExtension.SelectToken("parameters.location")["defaultValue"] = location;
-                templateParameterObjectCustomExtension.SelectToken("parameters.fileUris")["defaultValue"] = "https://raw.githubusercontent.com/onecliquezone/create-sysenv/main/create-environment-variables-windows.ps1";
-
-
-                templateParameterObjectCustomExtension.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {clientCode} -Fqdn {virtualMachineName}";
+                templateParameterObjectCustomExtension.SelectToken("parameters.fileUris")["defaultValue"] = createEnvironmentVariablesPsUrl;
+                templateParameterObjectCustomExtension.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {apiprefix} -Fqdn {fqdn}";
 
                 deploymentName = $"virtual-machine-extension-{uniqueId}".ToLower();
                 log.LogInformation($"Deploying virtual-machine-extension-{uniqueId}");
@@ -213,8 +239,6 @@ namespace LabsProvisioning
                     .WithParameters("{}")
                     .WithMode(Microsoft.Azure.Management.ResourceManager.Fluent.Models.DeploymentMode.Incremental)
                     .Create();
-
-                log.LogInformation(vmExtensionDeployment.ProvisioningState.Value);
 
                 if (vmExtensionDeployment.ProvisioningState.Value == ProvisioningState.Failed.Value)
                 {
@@ -233,8 +257,8 @@ namespace LabsProvisioning
                     {
                         log.LogInformation($"Deallocating {virtualMachineName}");
                         IVirtualMachine virtualMachine = _azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName);
-                        virtualMachine.Deallocate();
-                        log.LogInformation(_azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName).PowerState.Value);
+                        await virtualMachine.DeallocateAsync();
+                        log.LogInformation($"Deallocated {virtualMachineName}");
                         log.LogInformation("End of Provisioning");
 
                         return new OkObjectResult(vmDeployment.Outputs);

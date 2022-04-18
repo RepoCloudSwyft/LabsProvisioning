@@ -118,6 +118,18 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="app_insight" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\function-app\app-insight.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="azuredeploy_network" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\virtual-network\azuredeploy.network.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="forcestop_dailyreport" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\function-app\forcestop-dailyreport.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="nsg_web_app_network" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\virtual-network\nsg-web-app.network.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="parameterVm" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\parameterVm.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
