@@ -18,6 +18,7 @@ using Newtonsoft.Json.Linq;
 using System.Management.Automation;
 using Microsoft.Azure.Management.ResourceManager.Fluent.Models;
 using System.Collections.ObjectModel;
+using Microsoft.Azure.Management.Network.Fluent;
 
 namespace LabsProvisioning
 {
@@ -40,15 +41,7 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(newTenantModel.clientCode) ||
                 string.IsNullOrEmpty(newTenantModel.environment) ||
                 string.IsNullOrEmpty(newTenantModel.contactEmail) ||
-                string.IsNullOrEmpty(newTenantModel.location) ||
-                string.IsNullOrEmpty(newTenantModel.appServicePlanName) ||
-                string.IsNullOrEmpty(newTenantModel.appServicePlanResourceGroupName) ||
-                //string.IsNullOrEmpty(newTenantModel.storageAccountName) ||
-                string.IsNullOrEmpty(newTenantModel.clientName) ||
-                string.IsNullOrEmpty(newTenantModel.labsDataBase) ||
-                string.IsNullOrEmpty(newTenantModel.labsDataServer) ||
-                string.IsNullOrEmpty(newTenantModel.labsPassword) ||
-                string.IsNullOrEmpty(newTenantModel.labsUserId))
+                string.IsNullOrEmpty(newTenantModel.location))
             {
                 log.LogInformation("Incorect Request Body.");
                 log.LogInformation(JsonConvert.SerializeObject(newTenantModel));
@@ -69,27 +62,11 @@ namespace LabsProvisioning
             string environment                      = newTenantModel.environment;
             string contactEmail                     = newTenantModel.contactEmail;
             string location                         = newTenantModel.location;
-            string appServicePlanName               = newTenantModel.appServicePlanName;
-            string appServicePlanResourceGroupName  = newTenantModel.appServicePlanResourceGroupName;
-            string CC                               = ResourceHelper.GetEnvironmentVariable("CC");
-            string ClientName                       = newTenantModel.clientName;
-            string FROM                             = ResourceHelper.GetEnvironmentVariable("FROM");
-            string FROM_DAILYREPORT_EMAIL           = ResourceHelper.GetEnvironmentVariable("FROM_DAILYREPORT_EMAIL");
-            string LabsDataBase                     = newTenantModel.labsDataBase;
-            string LabsDataServer                   = newTenantModel.labsDataServer;
-            string LabsPassword                     = newTenantModel.labsPassword;
-            string LabsUserId                       = newTenantModel.labsUserId;
-            string SendGridKey                      = ResourceHelper.GetEnvironmentVariable("SendGridKey");
-            string SendGridName                     = ResourceHelper.GetEnvironmentVariable("SendGridName");
-            string TO                               = ResourceHelper.GetEnvironmentVariable("TO");
-            string WEBSITE_TIME_ZONE                = ResourceHelper.GetEnvironmentVariable("WEBSITE_TIME_ZONE");
 
             log.LogInformation("Generating New Tenant");
-            string resourceGroupName    = $"cs-{clientCode}-{environment}-rgrp".ToUpper();
-            string nsgName              = $"cs-{clientCode}-{environment}-nsg".ToUpper();
-            string vNetName             = $"cs-{clientCode}-{environment}-vnet".ToUpper();
-            string faName               = $"cs-{clientCode}-{environment}-fsdr".ToUpper();
-            string storageAccountName   = $"cs{clientCode}{environment}vhdsa".ToLower();
+            string resourceGroupName    = $"CS-{environment}-{clientCode}";
+            string nsgName              = $"CS-{environment}-{clientCode}-NSG";
+            string vNetName             = $"CS-{environment}-{clientCode}-vnet";
 
             log.LogInformation($"resourceGroupName: {resourceGroupName}");
             log.LogInformation($"nsgName: {nsgName}");
@@ -134,56 +111,6 @@ namespace LabsProvisioning
 
                 log.LogInformation($"SubscriptionId: {_azure.GetCurrentSubscription().SubscriptionId}");
 
-                // New-AzApplicationInsights -ResourceGroupName $resourceGroupName -Name $applicationInsightName -Location $location -ErrorVariable ErrApplicationInsight -ErrorAction SilentlyContinue
-                PowerShell ps = PowerShell.Create();
-
-                //ps.AddScript("Install-Module -Name Az -AllowClobber -Force");
-                //ps.Invoke();
-                //ps.AddScript("Import-Module -Name Az -Force");
-                //ps.Invoke();
-
-                //ps.AddCommand("New-AzApplicationInsights");
-                //ps.AddParameter("ResourceGroupName", resourceGroupName);
-                //ps.AddParameter("Name", faName);
-                //ps.AddParameter("Location", location);
-                //ps.Invoke();
-                ps.AddScript("Get-Module -ListAvailable");
-                Collection<PSObject> PSOutput = ps.Invoke();
-
-                // loop through each output object item
-                foreach (PSObject outputItem in PSOutput)
-                {
-                    // if null object was dumped to the pipeline during the script then a null
-                    // object may be present here. check for null to prevent potential NRE.
-                    if (outputItem != null)
-                    {
-                        //TODO: do something with the output item 
-                        // outputItem.BaseOBject
-                        log.LogInformation(outputItem.BaseObject.ToString());
-                    }
-                }
-
-                return new OkObjectResult(
-                    JsonConvert.SerializeObject(new
-                    {
-                        message = $"ok"
-                    })
-                );
-                IResourceGroup resourceGroups = _azure.ResourceGroups.List().Where(rg => rg.Name.Equals(resourceGroupName)).FirstOrDefault();
-
-                if (resourceGroups != null)
-                {
-                    log.LogInformation($"Resource group exist: {resourceGroupName}");
-                    log.LogInformation("End of New Tenant Creation");
-                    return new OkObjectResult(
-                        JsonConvert.SerializeObject(new
-                        {
-                            message = $"Resource group exist: {resourceGroupName}"
-                        })
-                    );
-                }
-
-
                 string uniqueId = Guid.NewGuid().ToString().Replace("-","");
 
                 JObject templateParameterObjectNSG = ResourceHelper.GetJObject(Properties.Resources.nsg_web_app_network);
@@ -192,94 +119,64 @@ namespace LabsProvisioning
 
                 JObject templateParameterObjectFSDR = ResourceHelper.GetJObject(Properties.Resources.forcestop_dailyreport);
 
-                JObject templateParameterObjectAppInsight = ResourceHelper.GetJObject(Properties.Resources.app_insight);
+                IResourceGroup resourceGroup;
+                INetworkSecurityGroup networkSecurityGroup;
+                INetwork virtualNetowrk;
+                try
+                {
+                    resourceGroup = _azure.ResourceGroups.GetByName(resourceGroupName);
+                }
+                catch
+                {
+                    resourceGroup = _azure.ResourceGroups.Define(resourceGroupName)
+                        .WithRegion(location)
+                        .WithTags(iTags)
+                        .Create();
+                }
 
-                templateParameterObjectAppInsight.SelectToken("parameters.location")["defaultValue"] = location;
-                templateParameterObjectAppInsight.SelectToken("parameters.name")["defaultValue"] = faName;
-                templateParameterObjectAppInsight.SelectToken("parameters.subscriptionId")["defaultValue"] = subscriptionId;
+                //IResourceGroup resourceGroup = _azure.ResourceGroups
+                //    .Define(resourceGroupName)
+                //    .WithRegion(location)
+                //    .WithTags(iTags)
+                //    .Create();
 
+                networkSecurityGroup = _azure.NetworkSecurityGroups.GetByResourceGroup(resourceGroupName, nsgName);
+                if (networkSecurityGroup == null)
+                {
+                    templateParameterObjectNSG.SelectToken("parameters.location")["defaultValue"] = location;
+                    templateParameterObjectNSG.SelectToken("parameters.nsgName")["defaultValue"] = nsgName;
+                    templateParameterObjectNSG.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
 
-                templateParameterObjectNSG.SelectToken("parameters.location")["defaultValue"] = location;
-                templateParameterObjectNSG.SelectToken("parameters.nsgName")["defaultValue"] = nsgName;
-                templateParameterObjectNSG.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
+                    log.LogInformation("Deploying Network Security Group");
+                    IDeployment networkSecurityGroupDeployment = await _azure.Deployments
+                        .Define($"nsg-{uniqueId}")
+                        .WithExistingResourceGroup(resourceGroup)
+                        .WithTemplate(templateParameterObjectNSG)
+                        .WithParameters("{}")
+                        .WithMode(DeploymentMode.Incremental)
+                        .CreateAsync();
+                    log.LogInformation("Network Security Group is done");
+                }
 
-                templateParameterObjectVNet.SelectToken("parameters.location")["defaultValue"] = location;
-                templateParameterObjectVNet.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
-                templateParameterObjectVNet.SelectToken("parameters.virtualNetworkName")["defaultValue"] = vNetName;
-                templateParameterObjectVNet.SelectToken("parameters.virtualMachineSubnetName")["defaultValue"] = "virtual-machines-labs-subnet";
-                templateParameterObjectVNet.SelectToken("parameters.nsgName")["defaultValue"] = nsgName;
+                virtualNetowrk = _azure.Networks.GetByResourceGroup(resourceGroupName, vNetName);
+                if (virtualNetowrk == null)
+                {
+                    templateParameterObjectVNet.SelectToken("parameters.location")["defaultValue"] = location;
+                    templateParameterObjectVNet.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
+                    templateParameterObjectVNet.SelectToken("parameters.virtualNetworkName")["defaultValue"] = vNetName;
+                    templateParameterObjectVNet.SelectToken("parameters.virtualMachineSubnetName")["defaultValue"] = "default";
+                    templateParameterObjectVNet.SelectToken("parameters.nsgName")["defaultValue"] = nsgName;
 
-                templateParameterObjectFSDR.SelectToken("parameters.subscriptionId")["defaultValue"] = subscriptionId;
-                templateParameterObjectFSDR.SelectToken("parameters.functionAppName")["defaultValue"] = faName;
-                templateParameterObjectFSDR.SelectToken("parameters.location")["defaultValue"] = location;
-                templateParameterObjectFSDR.SelectToken("parameters.appServicePlanName")["defaultValue"] = appServicePlanName;
-                templateParameterObjectFSDR.SelectToken("parameters.appServicePlanResourceGroupName")["defaultValue"] = appServicePlanResourceGroupName;
-                templateParameterObjectFSDR.SelectToken("parameters.resourceGroupName")["defaultValue"] = resourceGroupName;
-                templateParameterObjectFSDR.SelectToken("parameters.storageAccountName")["defaultValue"] = storageAccountName;
-                templateParameterObjectFSDR.SelectToken("parameters.CC")["defaultValue"] = $"'{CC}'";
-                templateParameterObjectFSDR.SelectToken("parameters.ClientCode")["defaultValue"] = clientCode;
-                templateParameterObjectFSDR.SelectToken("parameters.ClientId")["defaultValue"] = applicationId;
-                templateParameterObjectFSDR.SelectToken("parameters.ClientKey")["defaultValue"] = applicationKey;
-                templateParameterObjectFSDR.SelectToken("parameters.ClientName")["defaultValue"] = ClientName;
-                templateParameterObjectFSDR.SelectToken("parameters.FROM")["defaultValue"] = FROM;
-                templateParameterObjectFSDR.SelectToken("parameters.FROM_DAILYREPORT_EMAIL")["defaultValue"] = FROM_DAILYREPORT_EMAIL;
-                templateParameterObjectFSDR.SelectToken("parameters.LabsDataBase")["defaultValue"] = LabsDataBase;
-                templateParameterObjectFSDR.SelectToken("parameters.LabsDataServer")["defaultValue"] = LabsDataServer;
-                templateParameterObjectFSDR.SelectToken("parameters.LabsPassword")["defaultValue"] = LabsPassword;
-                templateParameterObjectFSDR.SelectToken("parameters.LabsUserId")["defaultValue"] = LabsUserId;
-                templateParameterObjectFSDR.SelectToken("parameters.SendGridKey")["defaultValue"] = SendGridKey;
-                templateParameterObjectFSDR.SelectToken("parameters.SendGridName")["defaultValue"] = SendGridName;
-                templateParameterObjectFSDR.SelectToken("parameters.TO")["defaultValue"] = $"'{TO}'";
-                templateParameterObjectFSDR.SelectToken("parameters.WEBSITE_TIME_ZONE")["defaultValue"] = WEBSITE_TIME_ZONE;
-                templateParameterObjectFSDR.SelectToken("parameters.TenantId")["defaultValue"] = tenantId;
-
-                IResourceGroup resourceGroup = _azure.ResourceGroups
-                    .Define(resourceGroupName)
-                    .WithRegion(location)
-                    .WithTags(iTags)
-                    .Create();
-
-                log.LogInformation("Deploying Network Security Group");
-                IDeployment networkSecurityGroupDeployment = await _azure.Deployments
-                    .Define($"nsg-{uniqueId}")
-                    .WithExistingResourceGroup(resourceGroup)
-                    .WithTemplate(templateParameterObjectNSG)
-                    .WithParameters("{}")
-                    .WithMode(DeploymentMode.Incremental)
-                    .CreateAsync();
-                log.LogInformation("Network Security Group is done");
-
-                log.LogInformation("Deploying Application Insight");
-                IDeployment appInsightDeployment = await _azure.Deployments
-                    .Define($"app-insihgt-{uniqueId}")
-                    .WithExistingResourceGroup(resourceGroup)
-                    .WithTemplate(templateParameterObjectAppInsight)
-                    .WithParameters("{}")
-                    .WithMode(DeploymentMode.Incremental)
-                    .CreateAsync();
-                log.LogInformation("Application Insight is done");
-
-                log.LogInformation("Deploying Virtual Network");
-                IDeployment virtualNetworkDeployment = await _azure.Deployments
-                    .Define($"vnet-{uniqueId}")
-                    .WithExistingResourceGroup(resourceGroup)
-                    .WithTemplate(templateParameterObjectVNet)
-                    .WithParameters("{}")
-                    .WithMode(DeploymentMode.Incremental)
-                    .CreateAsync();
-                log.LogInformation("Virtual Network is done");
-
-
-                log.LogInformation("Deploying Function App");
-                IDeployment functionAppDeployment = await _azure.Deployments
-                    .Define($"fa-{uniqueId}")
-                    .WithExistingResourceGroup(resourceGroup)
-                    .WithTemplate(templateParameterObjectFSDR)
-                    .WithParameters("{}")
-                    .WithMode(DeploymentMode.Incremental)
-                    .CreateAsync();
-                log.LogInformation("Function App is done");
-
+                    log.LogInformation("Deploying Virtual Network");
+                    IDeployment virtualNetworkDeployment = await _azure.Deployments
+                        .Define($"vnet-{uniqueId}")
+                        .WithExistingResourceGroup(resourceGroup)
+                        .WithTemplate(templateParameterObjectVNet)
+                        .WithParameters("{}")
+                        .WithMode(DeploymentMode.Incremental)
+                        .CreateAsync();
+                    log.LogInformation("Virtual Network is done");
+                }
 
                 log.LogInformation("End of New Tenant Creation");
 
@@ -288,8 +185,7 @@ namespace LabsProvisioning
                     {
                         resourcegroup = resourceGroupName,
                         nsg = nsgName,
-                        vnet = vNetName,
-                        fa = faName
+                        vnet = vNetName
                     })
                 );
             }

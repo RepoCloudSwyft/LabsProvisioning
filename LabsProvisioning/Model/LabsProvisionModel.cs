@@ -4,6 +4,8 @@ namespace LabsProvisioning.Model
 {
     public class LabsProvisionModel
     {
+        public string ResourceGroupName { get; set; }
+
         public string Location { get; set; }
 
         public string Environment { get; set; }

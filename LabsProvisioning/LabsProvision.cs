@@ -42,7 +42,7 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.Location) ||
                 string.IsNullOrEmpty(labsProvision.Environment) ||
                 string.IsNullOrEmpty(labsProvision.ClientCode) ||
-                //string.IsNullOrEmpty(labsProvision.VirtualMachineName) ||
+                string.IsNullOrEmpty(labsProvision.VirtualMachineName) ||
                 string.IsNullOrEmpty(labsProvision.Size) ||
                 string.IsNullOrEmpty(labsProvision.ImageUri) ||
                 string.IsNullOrEmpty(labsProvision.ContactPerson) ||
@@ -51,7 +51,8 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.ComputerName) ||
                 string.IsNullOrEmpty(labsProvision.Username) ||
                 string.IsNullOrEmpty(labsProvision.Password) ||
-                string.IsNullOrEmpty(labsProvision.Fqdn)) 
+                string.IsNullOrEmpty(labsProvision.Fqdn) ||
+                string.IsNullOrEmpty(labsProvision.ResourceGroupName)) 
             {
                 log.LogInformation("Incorect Request Body.");
 
@@ -83,6 +84,7 @@ namespace LabsProvisioning
             string computerName             = labsProvision.ComputerName;
             string username                 = labsProvision.Username;
             string password                 = labsProvision.Password;
+            string resourceGroupName        = labsProvision.ResourceGroupName;
 
             string fqdn                     = labsProvision.Fqdn;
             string apiprefix                = labsProvision.apiprefix;
@@ -101,14 +103,6 @@ namespace LabsProvisioning
                 AzureCredentials credentials = new AzureCredentials(principalLogIn, tenantId, azureEnvironment);
 
                 string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
-
-                if (string.IsNullOrEmpty(virtualMachineName))
-                {
-                    log.LogInformation("virtualMachineName parameter is empty.");
-                    log.LogInformation("Generating virtualMachineName");
-                    virtualMachineName = $"cs-{clientCode}-{environment}-VM-{uniqueId}".ToUpper();
-                    log.LogInformation($"virtualMachineName: {virtualMachineName}");
-                }
 
                 log.LogInformation($"subscriptionId: {subscriptionId}");
                 log.LogInformation($"tenantId: {tenantId}");
@@ -135,9 +129,11 @@ namespace LabsProvisioning
                 log.LogInformation(_azure.GetCurrentSubscription().SubscriptionId);
 
                 log.LogInformation("Getting labs dependencies");
-                string resourceGroupName        = $"cs-{clientCode}-{environment}-rgrp".ToUpper();
-                string networkSecurityGroupName = $"cs-{clientCode}-{environment}-nsg".ToUpper();
-                string virtualNetworkName       = $"cs-{clientCode}-{environment}-vnet".ToUpper();
+                //string resourceGroupName        = $"cs-{clientCode}-{environment}-rgrp".ToUpper();
+                //string networkSecurityGroupName = $"cs-{environment}-{clientCode}-nsg".ToUpper();
+                //string virtualNetworkName = $"cs-{environment}-{clientCode}-vnet".ToUpper();
+                string networkSecurityGroupName = $"CS-{environment}-{clientCode}-nsg";
+                string virtualNetworkName = $"CS-{environment}-{clientCode}-vnet";
 
                 log.LogInformation("Setting up tags");
 
@@ -163,7 +159,8 @@ namespace LabsProvisioning
 
                 log.LogInformation("Getting labs resource group name");
 
-                string labsResourceGroupName = await SetResourceGroupAsync(_azure, credentials, subscriptionId, location, environment, clientCode, contactPerson);
+                //string labsResourceGroupName = await SetResourceGroupAsync(_azure, credentials, subscriptionId, location, environment, clientCode, contactPerson);
+                string labsResourceGroupName = _azure.ResourceGroups.GetByName(resourceGroupName).Name;
 
                 Stream stream = new MemoryStream(Properties.Resources.templateVm);
                 JObject templateParameterObjectVirtualMachine = new JObject();
@@ -174,7 +171,7 @@ namespace LabsProvisioning
 
                 templateParameterObjectVirtualMachine.SelectToken("parameters.location")["defaultValue"] = location;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.networkSecurityGroupId")["defaultValue"] = nsgId;
-                templateParameterObjectVirtualMachine.SelectToken("parameters.subnetName")["defaultValue"] = "virtual-machines-labs-subnet";
+                templateParameterObjectVirtualMachine.SelectToken("parameters.subnetName")["defaultValue"] = "default";
                 templateParameterObjectVirtualMachine.SelectToken("parameters.virtualNetworkId")["defaultValue"] = vnetId;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.virtualMachineName")["defaultValue"] = virtualMachineName;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.computerName")["defaultValue"] = computerName;
@@ -204,12 +201,8 @@ namespace LabsProvisioning
                 {
                     log.LogInformation("End of Provisioning");
                     log.LogError("Deployment Failed");
-                    return new BadRequestObjectResult(
-                        JsonConvert.SerializeObject(new
-                        {
-                            message = JsonConvert.SerializeObject("Deployment Failed")
-                        })
-                    );
+
+                    return new BadRequestObjectResult(false);
                 }
 
 
@@ -244,12 +237,8 @@ namespace LabsProvisioning
                 {
                     log.LogInformation("End of Provisioning");
                     log.LogError("System environment Deployment Failed");
-                    return new BadRequestObjectResult(
-                        JsonConvert.SerializeObject(new
-                        {
-                            message = JsonConvert.SerializeObject("System environment Deployment Failed")
-                        })
-                    );
+
+                    return new BadRequestObjectResult(false);
                 }
                 log.LogInformation($"Deallocate when done: {deallocateWhenFinish}");
                 if (deallocateWhenFinish) {
@@ -258,10 +247,10 @@ namespace LabsProvisioning
                         log.LogInformation($"Deallocating {virtualMachineName}");
                         IVirtualMachine virtualMachine = _azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName);
                         await virtualMachine.DeallocateAsync();
-                        log.LogInformation($"Deallocated {virtualMachineName}");
+                        log.LogInformation($"Deallocated");
                         log.LogInformation("End of Provisioning");
 
-                        return new OkObjectResult(vmDeployment.Outputs);
+                        return new OkObjectResult(true);
                     }
                     catch (Exception e)
                     {
@@ -269,25 +258,20 @@ namespace LabsProvisioning
                         log.LogError(e.Message);
                         log.LogError("End of Provisioning");
 
-                        return new BadRequestObjectResult(e.Message);
+                        return new BadRequestObjectResult(false);
                     }
                 }
 
                 log.LogInformation("End of Provisioning");
 
-                return new OkObjectResult(vmDeployment.Outputs);
+                return new OkObjectResult(true);
 
 
             }
             catch (Exception e)
             {
                 log.LogError(e.Message);
-                return new BadRequestObjectResult(
-                    JsonConvert.SerializeObject(new
-                    {
-                        message = JsonConvert.SerializeObject(e.Message)
-                    })
-                );
+                return new BadRequestObjectResult(false);
             }
         }
 
