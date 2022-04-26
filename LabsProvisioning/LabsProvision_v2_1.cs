@@ -50,7 +50,6 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.ComputerName) ||
                 string.IsNullOrEmpty(labsProvision.Username) ||
                 string.IsNullOrEmpty(labsProvision.Password) ||
-                string.IsNullOrEmpty(labsProvision.Fqdn) ||
                 string.IsNullOrEmpty(labsProvision.ResourceGroupName))
             {
                 log.LogInformation("Incorect Request Body.");
@@ -126,6 +125,8 @@ namespace LabsProvisioning
                       .Authenticate(credentials)
                       .WithSubscription(subscriptionId);
 
+
+
                 log.LogInformation(_azure.GetCurrentSubscription().SubscriptionId);
 
                 log.LogInformation("Getting labs dependencies");
@@ -162,10 +163,40 @@ namespace LabsProvisioning
                 //string labsResourceGroupName = await SetResourceGroupAsync(_azure, credentials, subscriptionId, location, environment, clientCode, contactPerson);
                 string labsResourceGroupName = _azure.ResourceGroups.GetByName(resourceGroupName).Name;
 
-                Stream stream = new MemoryStream(Properties.Resources.azuredeploywindows);
+                Stream stream;// = new MemoryStream(Properties.Resources.azuredeploywindows);
                 JObject templateParameterObjectVirtualMachine = new JObject();
-                StreamReader template = new StreamReader(stream);
-                JsonTextReader reader = new JsonTextReader(template);
+                StreamReader template;// = new StreamReader(stream);
+                JsonTextReader reader;// = new JsonTextReader(template);
+
+                switch (osType.ToUpper())
+                {
+                    case "WINDOWS":
+                        {
+                            stream = new MemoryStream(Properties.Resources.azuredeploywindows);
+                            template = new StreamReader(stream);
+                            reader = new JsonTextReader(template);
+                            templateParameterObjectVirtualMachine.SelectToken("parameters.fileUris")["defaultValue"] = createEnvironmentVariablesPsUrl;
+                            templateParameterObjectVirtualMachine.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {apiprefix} -Fqdn {fqdn}";
+                            break;
+                        }
+                    case "UBUNTU":
+                    case "LINUX":
+                        {
+                            stream = new MemoryStream(Properties.Resources.azuredeploylinux);
+                            template = new StreamReader(stream);
+                            reader = new JsonTextReader(template);
+                            break;
+                        }
+                    default:
+                        {
+                            return new BadRequestObjectResult(
+                                JsonConvert.SerializeObject(new
+                                {
+                                    message = "Incorect OsType. Must be WINDOWS, UBUNTU or LINUX",
+                                })
+                            );
+                        }
+                }
 
                 templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
 
@@ -185,8 +216,6 @@ namespace LabsProvisioning
                 templateParameterObjectVirtualMachine.SelectToken("parameters.imageUri")["defaultValue"] = imageUri;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
                 templateParameterObjectVirtualMachine.SelectToken("parameters.diskSizeGB")["defaultValue"] = tempStorageSizeInGb;
-                templateParameterObjectVirtualMachine.SelectToken("parameters.fileUris")["defaultValue"] = createEnvironmentVariablesPsUrl;
-                templateParameterObjectVirtualMachine.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {apiprefix} -Fqdn {fqdn}";
 
                 string deploymentName = $"virtual-machine-{uniqueId}".ToLower();
                 log.LogInformation($"Deploying virtual-machine-{uniqueId}".ToLower());

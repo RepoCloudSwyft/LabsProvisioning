@@ -121,6 +121,9 @@
   <data name="app_insight" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\function-app\app-insight.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="azuredeploylinux" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\linux\azuredeploylinux.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="azuredeploywindows" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\windows\azuredeploywindows.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>

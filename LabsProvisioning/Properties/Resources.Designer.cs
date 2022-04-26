@@ -83,6 +83,16 @@ namespace LabsProvisioning.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] azuredeploylinux {
+            get {
+                object obj = ResourceManager.GetObject("azuredeploylinux", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] azuredeploywindows {
             get {
                 object obj = ResourceManager.GetObject("azuredeploywindows", resourceCulture);
