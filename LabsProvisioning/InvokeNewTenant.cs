@@ -54,19 +54,19 @@ namespace LabsProvisioning
                 );
             }
 
-            string applicationId                    = newTenantModel.applicationId;
-            string applicationKey                   = newTenantModel.applicationKey;
-            string subscriptionId                   = newTenantModel.subscriptionId;
-            string tenantId                         = newTenantModel.tenantId;
-            string clientCode                       = newTenantModel.clientCode;
-            string environment                      = newTenantModel.environment;
-            string contactEmail                     = newTenantModel.contactEmail;
-            string location                         = newTenantModel.location;
+            string applicationId = newTenantModel.applicationId;
+            string applicationKey = newTenantModel.applicationKey;
+            string subscriptionId = newTenantModel.subscriptionId;
+            string tenantId = newTenantModel.tenantId;
+            string clientCode = newTenantModel.clientCode;
+            string environment = newTenantModel.environment;
+            string contactEmail = newTenantModel.contactEmail;
+            string location = newTenantModel.location;
 
             log.LogInformation("Generating New Tenant");
-            string resourceGroupName    = $"CS-{environment}-{clientCode}";
-            string nsgName              = $"CS-{environment}-{clientCode}-NSG";
-            string vNetName             = $"CS-{environment}-{clientCode}-vnet";
+            string resourceGroupName = $"CS-{clientCode}-{environment}-RGRP".ToUpper();
+            string nsgName = $"CS-{clientCode}-{environment}-NSG".ToUpper();
+            string vNetName = $"CS-{clientCode}-{environment}-vnet".ToUpper();
 
             log.LogInformation($"resourceGroupName: {resourceGroupName}");
             log.LogInformation($"nsgName: {nsgName}");
@@ -96,7 +96,8 @@ namespace LabsProvisioning
 
             log.LogInformation("Checking Authentication");
 
-            try {
+            try
+            {
                 ServicePrincipalLoginInformation principalLogIn = new ServicePrincipalLoginInformation();
                 principalLogIn.ClientId = applicationId;
                 principalLogIn.ClientSecret = applicationKey;
@@ -111,13 +112,13 @@ namespace LabsProvisioning
 
                 log.LogInformation($"SubscriptionId: {_azure.GetCurrentSubscription().SubscriptionId}");
 
-                string uniqueId = Guid.NewGuid().ToString().Replace("-","");
+                string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
 
                 JObject templateParameterObjectNSG = ResourceHelper.GetJObject(Properties.Resources.nsg_web_app_network);
 
                 JObject templateParameterObjectVNet = ResourceHelper.GetJObject(Properties.Resources.azuredeploy_network);
 
-                JObject templateParameterObjectFSDR = ResourceHelper.GetJObject(Properties.Resources.forcestop_dailyreport);
+                // JObject templateParameterObjectFSDR = ResourceHelper.GetJObject(Properties.Resources.forcestop_dailyreport);
 
                 IResourceGroup resourceGroup;
                 INetworkSecurityGroup networkSecurityGroup;
@@ -125,6 +126,16 @@ namespace LabsProvisioning
                 try
                 {
                     resourceGroup = _azure.ResourceGroups.GetByName(resourceGroupName);
+                    if (resourceGroup != null)
+                    {
+                        log.LogInformation($"Resource Group {resourceGroup.Name} already exist.");
+                        return new BadRequestObjectResult(
+                            JsonConvert.SerializeObject(new
+                            {
+                                message = $"Resource Group {resourceGroup.Name} already exist.",
+                            })
+                        );
+                    }
                 }
                 catch
                 {
@@ -133,12 +144,6 @@ namespace LabsProvisioning
                         .WithTags(iTags)
                         .Create();
                 }
-
-                //IResourceGroup resourceGroup = _azure.ResourceGroups
-                //    .Define(resourceGroupName)
-                //    .WithRegion(location)
-                //    .WithTags(iTags)
-                //    .Create();
 
                 networkSecurityGroup = _azure.NetworkSecurityGroups.GetByResourceGroup(resourceGroupName, nsgName);
                 if (networkSecurityGroup == null)
@@ -189,7 +194,8 @@ namespace LabsProvisioning
                     })
                 );
             }
-            catch (Exception e) {
+            catch (Exception e)
+            {
                 log.LogInformation("End of New Tenant Creation");
                 log.LogError("Deployment Failed");
                 return new BadRequestObjectResult(

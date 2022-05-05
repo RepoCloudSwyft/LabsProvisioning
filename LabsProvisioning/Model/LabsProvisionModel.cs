@@ -42,7 +42,7 @@ namespace LabsProvisioning.Model
 
         public string TenantId { get; set; }
 
-        public bool DeallocateWhenFinish { get; set; } = true;
+        public bool DeallocateWhenFinish { get; set; } = false;
 
         public string Fqdn { get; set; }
 
