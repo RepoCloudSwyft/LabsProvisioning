@@ -175,6 +175,7 @@ namespace LabsProvisioning
                             stream = new MemoryStream(Properties.Resources.azuredeploywindows);
                             template = new StreamReader(stream);
                             reader = new JsonTextReader(template);
+                            templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
                             templateParameterObjectVirtualMachine.SelectToken("parameters.fileUris")["defaultValue"] = createEnvironmentVariablesPsUrl;
                             templateParameterObjectVirtualMachine.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {apiprefix} -Fqdn {fqdn}";
                             break;
@@ -185,6 +186,7 @@ namespace LabsProvisioning
                             stream = new MemoryStream(Properties.Resources.azuredeploylinux);
                             template = new StreamReader(stream);
                             reader = new JsonTextReader(template);
+                            templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
                             break;
                         }
                     default:
@@ -198,7 +200,6 @@ namespace LabsProvisioning
                         }
                 }
 
-                templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
 
                 templateParameterObjectVirtualMachine.SelectToken("parameters.location")["defaultValue"] = location;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.networkSecurityGroupId")["defaultValue"] = nsgId;
