@@ -48,5 +48,7 @@ namespace LabsProvisioning.Model
 
         public string apiprefix { get; set; }
 
+        public string uniqueId { get; set; }
+
     }
 }

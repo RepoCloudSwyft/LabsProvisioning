@@ -49,7 +49,8 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.OsType) ||
                 string.IsNullOrEmpty(labsProvision.ComputerName) ||
                 string.IsNullOrEmpty(labsProvision.Username) ||
-                string.IsNullOrEmpty(labsProvision.Password))
+                string.IsNullOrEmpty(labsProvision.Password) ||
+                string.IsNullOrEmpty(labsProvision.uniqueId))
             {
                 log.LogInformation("Incorect Request Body.");
 
@@ -99,7 +100,7 @@ namespace LabsProvisioning
                 AzureEnvironment azureEnvironment = AzureEnvironment.AzureGlobalCloud;
                 AzureCredentials credentials = new AzureCredentials(principalLogIn, tenantId, azureEnvironment);
 
-                string uniqueId = Guid.NewGuid().ToString().Replace("-", "");
+                string uniqueId = labsProvision.uniqueId; // Guid.NewGuid().ToString().Replace("-", "");
 
                 log.LogInformation($"subscriptionId: {subscriptionId}");
                 log.LogInformation($"tenantId: {tenantId}");
@@ -130,7 +131,7 @@ namespace LabsProvisioning
                 log.LogInformation("Getting labs dependencies");
                 string resourceGroupName        = $"cs-{clientCode}-{environment}-rgrp".ToUpper();
                 string networkSecurityGroupName = $"cs-{clientCode}-{environment}-nsg".ToUpper();
-                string virtualNetworkName = $"cs-{clientCode}-{environment}-vnet".ToUpper();
+                string virtualNetworkName       = $"cs-{clientCode}-{environment}-vnet".ToUpper();
 
                 log.LogInformation("Setting up tags");
 
@@ -236,36 +237,36 @@ namespace LabsProvisioning
                     }));
                 }
 
-                log.LogInformation($"Deallocate when done: {deallocateWhenFinish}");
-                if (deallocateWhenFinish)
-                {
-                    try
-                    {
-                        log.LogInformation($"Deallocating {virtualMachineName}");
-                        IVirtualMachine virtualMachine = _azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName);
-                        await virtualMachine.DeallocateAsync();
-                        log.LogInformation($"Deallocated");
-                        log.LogInformation("End of Provisioning");
+                //log.LogInformation($"Deallocate when done: {deallocateWhenFinish}");
+                //if (deallocateWhenFinish)
+                //{
+                //    try
+                //    {
+                //        log.LogInformation($"Deallocating {virtualMachineName}");
+                //        IVirtualMachine virtualMachine = _azure.VirtualMachines.GetByResourceGroup(labsResourceGroupName, virtualMachineName);
+                //        virtualMachine.Deallocate();
+                //        log.LogInformation($"Deallocated");
+                //        log.LogInformation("End of Provisioning");
 
-                        return new OkObjectResult(JsonConvert.SerializeObject(new
-                        {
-                            message = "Deployment is done",
-                            result = true
-                        }));
-                    }
-                    catch (Exception e)
-                    {
+                //        return new OkObjectResult(JsonConvert.SerializeObject(new
+                //        {
+                //            message = "Deployment is done",
+                //            result = true
+                //        }));
+                //    }
+                //    catch (Exception e)
+                //    {
 
-                        log.LogError(e.Message);
-                        log.LogError("End of Provisioning");
+                //        log.LogError(e.Message);
+                //        log.LogError("End of Provisioning");
 
-                        return new BadRequestObjectResult(JsonConvert.SerializeObject(new
-                        {
-                            message = e.Message,
-                            result = false
-                        }));
-                    }
-                }
+                //        return new BadRequestObjectResult(JsonConvert.SerializeObject(new
+                //        {
+                //            message = e.Message,
+                //            result = false
+                //        }));
+                //    }
+                //}
 
                 log.LogInformation("End of Provisioning");
 
