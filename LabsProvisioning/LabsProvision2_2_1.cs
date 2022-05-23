@@ -135,7 +135,9 @@ namespace LabsProvisioning
                 string resourceGroupName = (isVersion2_2 ? $"cs-{clientCode}-{environment}-rgrp" : labsProvision.ResourceGroupName).ToUpper();
                 string networkSecurityGroupName = (isVersion2_2 ? $"cs-{clientCode}-{environment}-nsg" : $"CS-{environment}-{clientCode}-nsg").ToUpper();
                 string virtualNetworkName = (isVersion2_2 ? $"cs-{clientCode}-{environment}-vnet" : $"CS-{environment}-{clientCode}-vnet").ToUpper();
-
+                log.LogInformation($"RG: {resourceGroupName}");
+                log.LogInformation($"NSG: {networkSecurityGroupName}");
+                log.LogInformation($"VNET: {virtualNetworkName}");
 
                 log.LogInformation("Setting up tags");
 
@@ -162,6 +164,7 @@ namespace LabsProvisioning
                 log.LogInformation("Getting labs resource group name");
 
                 string labsResourceGroupName = isVersion2_2 ? await SetResourceGroupAsync(_azure, credentials, subscriptionId, location, environment, clientCode, contactPerson) : _azure.ResourceGroups.GetByName(resourceGroupName).Name;
+                log.LogInformation($"RG: {labsResourceGroupName}");
 
                 Stream stream;// = new MemoryStream(Properties.Resources.azuredeploywindows);
                 JObject templateParameterObjectVirtualMachine = new JObject();
