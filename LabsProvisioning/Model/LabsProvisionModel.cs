@@ -50,5 +50,9 @@ namespace LabsProvisioning.Model
 
         public string uniqueId { get; set; }
 
+        public bool IsManaged { get; set; } = false;
+
+        public string imageReferenceId { get; set; }
+
     }
 }

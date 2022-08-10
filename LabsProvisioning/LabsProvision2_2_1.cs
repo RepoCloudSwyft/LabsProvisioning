@@ -43,7 +43,7 @@ namespace LabsProvisioning
                 string.IsNullOrEmpty(labsProvision.ClientCode) ||
                 string.IsNullOrEmpty(labsProvision.VirtualMachineName) ||
                 string.IsNullOrEmpty(labsProvision.Size) ||
-                string.IsNullOrEmpty(labsProvision.ImageUri) ||
+                //string.IsNullOrEmpty(labsProvision.ImageUri) ||
                 string.IsNullOrEmpty(labsProvision.ContactPerson) ||
                 string.IsNullOrEmpty(labsProvision.StorageAccountName) ||
                 string.IsNullOrEmpty(labsProvision.OsType) ||
@@ -63,6 +63,38 @@ namespace LabsProvisioning
                 );
             }
 
+            if (labsProvision.IsManaged)
+            {
+                if (string.IsNullOrEmpty(labsProvision.imageReferenceId))
+                {
+                    log.LogInformation("Incorect Request Body.");
+
+                    return new BadRequestObjectResult(
+                        JsonConvert.SerializeObject(new
+                        {
+                            message = "Incorect Request Body.",
+                            requestBody = JsonConvert.SerializeObject(labsProvision)
+                        })
+                    );
+                }
+            }
+            else 
+            {
+                if (string.IsNullOrEmpty(labsProvision.ImageUri))
+                {
+                    log.LogInformation("Incorect Request Body.");
+
+                    return new BadRequestObjectResult(
+                        JsonConvert.SerializeObject(new
+                        {
+                            message = "Incorect Request Body.",
+                            requestBody = JsonConvert.SerializeObject(labsProvision)
+                        })
+                    );
+                }
+            }
+
+
             string subscriptionId = labsProvision.SubscriptionId;
             string tenantId = labsProvision.TenantId;
             string applicationId = labsProvision.ApplicationId;
@@ -76,6 +108,7 @@ namespace LabsProvisioning
             string size = labsProvision.Size;
             int tempStorageSizeInGb = labsProvision.TempStorageSizeInGb;
             string imageUri = labsProvision.ImageUri;
+            string imageReferenceId = labsProvision.imageReferenceId;
             string contactPerson = labsProvision.ContactPerson;
             string storageAccountName = labsProvision.StorageAccountName;
             string osType = labsProvision.OsType;
@@ -92,6 +125,8 @@ namespace LabsProvisioning
             string createEnvironmentVariablesPsUrl = ResourceHelper.GetEnvironmentVariable("CreateEnvironmentVariablesPsUrl");
 
             bool isVersion2_2 = string.IsNullOrEmpty(labsProvision.ResourceGroupName);
+
+            bool isManaged = labsProvision.IsManaged;
 
             try
             {
@@ -175,12 +210,28 @@ namespace LabsProvisioning
                 {
                     case "WINDOWS":
                         {
-                            stream = new MemoryStream(Properties.Resources.azuredeploywindows);
-                            template = new StreamReader(stream);
-                            reader = new JsonTextReader(template);
-                            templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
+                            if (isManaged)
+                            {
+                                log.LogInformation("INF | OS DISK TYPE: MANAGED");
+                                stream = new MemoryStream(Properties.Resources.azuredeploywindowsmanaged);
+                                template = new StreamReader(stream);
+                                reader = new JsonTextReader(template);
+                                templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
+                                templateParameterObjectVirtualMachine.SelectToken("parameters.imageReferenceId")["defaultValue"] = imageReferenceId;
+                            }
+                            else 
+                            {
+                                log.LogInformation("INF | OS DISK TYPE: UNMANAGED");
+                                stream = new MemoryStream(Properties.Resources.azuredeploywindows);
+                                template = new StreamReader(stream);
+                                reader = new JsonTextReader(template);
+                                templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
+                                templateParameterObjectVirtualMachine.SelectToken("parameters.imageUri")["defaultValue"] = imageUri;
+                            }
                             templateParameterObjectVirtualMachine.SelectToken("parameters.fileUris")["defaultValue"] = createEnvironmentVariablesPsUrl;
                             templateParameterObjectVirtualMachine.SelectToken("parameters.arguments")["defaultValue"] = $"-ResourceGroupName {labsResourceGroupName} -VirtualMachineName {virtualMachineName} -ComputerName {computerName} -TenantId {tenantId} -GroupCode {apiprefix} -Fqdn {fqdn}";
+                            
+                            
                             break;
                         }
                     case "UBUNTU":
@@ -217,7 +268,6 @@ namespace LabsProvisioning
                 templateParameterObjectVirtualMachine.SelectToken("parameters.adminUsername")["defaultValue"] = username;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.adminPassword")["defaultValue"] = password;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.newTemplateName")["defaultValue"] = virtualMachineName;
-                templateParameterObjectVirtualMachine.SelectToken("parameters.imageUri")["defaultValue"] = imageUri;
                 templateParameterObjectVirtualMachine.SelectToken("parameters.tags")["defaultValue"] = JToken.FromObject(rgTags);
                 templateParameterObjectVirtualMachine.SelectToken("parameters.diskSizeGB")["defaultValue"] = tempStorageSizeInGb;
 
