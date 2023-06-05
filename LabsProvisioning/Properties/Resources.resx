@@ -133,6 +133,9 @@
   <data name="azuredeploy_network" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\virtual-network\azuredeploy.network.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="firewall" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\virtual-network\firewall.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="forcestop_dailyreport" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\function-app\forcestop-dailyreport.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>

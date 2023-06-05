@@ -1,0 +1,500 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualnetwork_name": {
+            "type": "string"
+        },
+        "routetables_firewall_route_name": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]"
+        },
+        "tags": {
+        "defaultValue": {},
+            "type": "object"
+        },
+        "nsgName": {
+            "type": "string"
+        },
+        "azure_firewalls_name": {
+            "type": "string"
+        },
+        "rules": {
+            "defaultValue": [
+                {
+                    "name": "Allow-Google",
+                    "protocols": [
+                        {
+                            "protocolType": "Http",
+                            "port": 80
+                        },
+                        {
+                            "protocolType": "Https",
+                            "port": 443
+                        }
+                    ],
+                    "fqdnTags": [],
+                    "targetFqdns": [
+                        "www.google.com"
+                    ],
+                    "sourceAddresses": [
+                        "10.0.2.0/24"
+                    ],
+                    "sourceIpGroups": []
+                },
+                {
+                    "name": "Allow-Youtube",
+                    "protocols": [
+                        {
+                            "protocolType": "Http",
+                            "port": 80
+                        },
+                        {
+                            "protocolType": "Https",
+                            "port": 443
+                        }
+                    ],
+                    "fqdnTags": [],
+                    "targetFqdns": [
+                        "*.youtube.com"
+                    ],
+                    "sourceAddresses": [
+                        "10.0.2.0/24"
+                    ],
+                    "sourceIpGroups": []
+                }
+            ],
+            "type": "array",
+            "metadata": {
+                "description": "description"
+            }
+        }
+
+    },
+    "variables": {
+        "azure_firewall_subnet_name": "AzureFirewallSubnet",
+        "workload_subnet_name": "Workload-SN",
+        "route_name": "fw-dg",
+        "publicIPAddresses_fw_pip_name": "fw-pip"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2018-12-01",
+            "name": "[parameters('nsgName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "securityRules": [
+                {
+                    "name": "Allow_RDP",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "3389",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 100,
+                    "direction": "Inbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "Allow_SSH",
+                    "properties": {
+                        "protocol": "*",
+                        "sourcePortRange": "*",
+                        "destinationPortRange": "22",
+                        "sourceAddressPrefix": "*",
+                        "destinationAddressPrefix": "*",
+                        "access": "Allow",
+                        "priority": 110,
+                        "direction": "Inbound",
+                        "sourcePortRanges": [],
+                        "destinationPortRanges": [],
+                        "sourceAddressPrefixes": [],
+                        "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "Allow_Internet",
+                    "properties": {
+                        "protocol": "*",
+                        "sourcePortRange": "*",
+                        "destinationPortRange": "*",
+                        "sourceAddressPrefix": "*",
+                        "destinationAddressPrefix": "Internet",
+                        "access": "Allow",
+                        "priority": 900,
+                        "direction": "Outbound",
+                        "sourcePortRanges": [],
+                        "destinationPortRanges": [],
+                        "sourceAddressPrefixes": [],
+                        "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "AllowAzureSqlOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "VirtualNetwork",
+                    "destinationAddressPrefix": "Sql",
+                    "access": "Allow",
+                    "priority": 1000,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "AllowStorageOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "VirtualNetwork",
+                    "destinationAddressPrefix": "Storage",
+                    "access": "Allow",
+                    "priority": 1010,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "AllowKeyVaultOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "VirtualNetwork",
+                    "destinationAddressPrefix": "AzureKeyVault",
+                    "access": "Allow",
+                    "priority": 1020,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "AllowAzureMonitorOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "VirtualNetwork",
+                    "destinationAddressPrefix": "AzureMonitor",
+                    "access": "Allow",
+                    "priority": 1030,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "AllowAppServiceOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "VirtualNetwork",
+                    "destinationAddressPrefix": "AppService",
+                    "access": "Allow",
+                    "priority": 1040,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },	  
+                {
+                    "name": "DenyAllTCPOutBound",
+                    "properties": {
+                    "protocol": "TCP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Deny",
+                    "priority": 4060,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                },
+                {
+                    "name": "DenyAllUDPOutBound",
+                    "properties": {
+                    "protocol": "UDP",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Deny",
+                    "priority": 4070,
+                    "direction": "Outbound",
+                    "sourcePortRanges": [],
+                    "destinationPortRanges": [],
+                    "sourceAddressPrefixes": [],
+                    "destinationAddressPrefixes": []
+                    }
+                }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/routeTables",
+            "apiVersion": "2022-11-01",
+            "name": "[parameters('routeTables_firewall_route_name')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "disableBgpRoutePropagation": false,
+                "routes": [
+                    {
+                        "name": "[variables('route_name')]",
+                        "id": "[resourceId('Microsoft.Network/routeTables/routes', parameters('routeTables_firewall_route_name'), variables('route_name'))]",
+                        "properties": {
+                            "addressPrefix": "0.0.0.0/0",
+                            "nextHopType": "VirtualAppliance",
+                            "nextHopIpAddress": "10.0.1.4",
+                            "hasBgpOverride": false
+                        },
+                        "type": "Microsoft.Network/routeTables/routes"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/routeTables/routes",
+            "apiVersion": "2022-11-01",
+            "name": "[concat(parameters('routetables_firewall_route_name'), '/', variables('route_name'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/routeTables', parameters('routetables_firewall_route_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "0.0.0.0/0",
+                "nextHopType": "VirtualAppliance",
+                "nextHopIpAddress": "10.0.1.4",
+                "hasBgpOverride": false
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2022-11-01",
+            "name": "[parameters('virtualnetwork_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/routeTables', parameters('routetables_firewall_route_name'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('azure_firewall_subnet_name')]",
+                        "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), variables('azure_firewall_subnet_name'))]",
+                        "properties": {
+                            "addressPrefix": "10.0.1.0/26",
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Disabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        },
+                        "type": "Microsoft.Network/virtualNetworks/subnets"
+                    },
+                    {
+                        "name": "[variables('workload_subnet_name')]",
+                        "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), variables('workload_subnet_name'))]",
+                        "properties": {
+                            "addressPrefix": "10.0.2.0/24",
+                            "routeTable": {
+                                "id": "[resourceId('Microsoft.Network/routeTables', parameters('routetables_firewall_route_name'))]"
+                            },
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Disabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        },
+                        "type": "Microsoft.Network/virtualNetworks/subnets"
+                    }
+                ],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2022-11-01",
+            "name": "[concat(parameters('virtualnetwork_name'), '/', variables('azure_firewall_subnet_name'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualnetwork_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.0.1.0/26",
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Disabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2022-11-01",
+            "name": "[variables('publicIPAddresses_fw_pip_name')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            },
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('publicIPAddresses_fw_pip_name')]"
+                },
+                "ipTags": [],
+                "ddosSettings": {
+                    "protectionMode": "VirtualNetworkInherited"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/azureFirewalls",
+            "apiVersion": "2022-11-01",
+            "name": "[parameters('azure_firewalls_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddresses_fw_pip_name'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), variables('azure_firewall_subnet_name'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "AZFW_VNet",
+                    "tier": "Standard"
+                },
+                "threatIntelMode": "Alert",
+                "additionalProperties": {},
+                "ipConfigurations": [
+                    {
+                        "name": "fw-pip",
+                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/azureFirewallIpConfigurations/fw-pip')]",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddresses_fw_pip_name'))]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), 'AzureFirewallSubnet')]"
+                            }
+                        }
+                    }
+                ],
+                "networkRuleCollections": [
+                    {
+                        "name": "Net-Coll01",
+                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/networkRuleCollections/Net-Coll01')]",
+                        "properties": {
+                            "priority": 200,
+                            "action": {
+                                "type": "Allow"
+                            },
+                            "rules": [
+                                {
+                                    "name": "Allow-DNS",
+                                    "protocols": [
+                                        "UDP"
+                                    ],
+                                    "sourceAddresses": [
+                                        "10.0.2.0/24"
+                                    ],
+                                    "destinationAddresses": [
+                                        "209.244.0.3",
+                                        "209.244.0.4"
+                                    ],
+                                    "sourceIpGroups": [],
+                                    "destinationIpGroups": [],
+                                    "destinationFqdns": [],
+                                    "destinationPorts": [
+                                        "53"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "applicationRuleCollections": [
+                    {
+                        "name": "App-Coll01",
+                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/applicationRuleCollections/App-Coll01')]",
+                        "properties": {
+                            "priority": 200,
+                            "action": {
+                                "type": "Allow"
+                            },
+                            "rules": "[parameters('rules')]"
+                        }
+                    }
+                ],
+                "natRuleCollections": [
+                    {
+                        "name": "rdp",
+                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/natRuleCollections/rdp')]",
+                        "properties": {
+                            "priority": 200,
+                            "action": {
+                                "type": "Dnat"
+                            },
+                            "rules": [
+                                {
+                                    "name": "rdp-nat",
+                                    "protocols": [
+                                        "TCP"
+                                    ],
+                                    "translatedAddress": "10.0.2.1",
+                                    "translatedPort": "3389",
+                                    "sourceAddresses": [
+                                        "*"
+                                    ],
+                                    "sourceIpGroups": [],
+                                    "destinationAddresses": [
+                                        "[reference(variables('publicIPAddresses_fw_pip_name')).IpAddress]"
+                                    ],
+                                    "destinationPorts": [
+                                        "3389"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "public_ip": {
+            "type": "string",
+            "value": "[reference(variables('publicIPAddresses_fw_pip_name')).IpAddress]"
+        }
+    }
+
+}
