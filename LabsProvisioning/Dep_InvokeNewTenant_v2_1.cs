@@ -22,7 +22,7 @@ using Microsoft.Azure.Management.Network.Fluent;
 
 namespace LabsProvisioning
 {
-    public static class InvokeNewTenant_v2_1
+    public static class Dep_InvokeNewTenant_v2_1
     {
         [FunctionName("InvokeNewTenant_v2_1")]
         public static async Task<IActionResult> Run(

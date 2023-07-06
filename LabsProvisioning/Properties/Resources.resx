@@ -127,6 +127,9 @@
   <data name="azuredeploywindows" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\windows\azuredeploywindows.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="azuredeploywindowsfirewall" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\templates\windows\azuredeploywindowsfirewall.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="azuredeploywindowsmanaged" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\templates\windows\azuredeploywindowsmanaged.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>

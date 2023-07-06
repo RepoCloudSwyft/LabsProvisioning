@@ -23,7 +23,7 @@ using Microsoft.Azure.Management.Compute.Fluent;
 
 namespace LabsProvisioning
 {
-    public static class LabsProvision
+    public static class Dep_LabsProvision
     {
         [FunctionName("LabsProvision")]
         public static async Task<IActionResult> Run(

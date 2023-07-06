@@ -69,6 +69,7 @@ namespace LabsProvisioning
             string vNetName = $"CS-{clientCode}-{environment}-vnet".ToUpper();
             string firewallRouteName = $"CS-{clientCode}-{environment}-fwr".ToUpper();
             string firewallName = $"CS-{clientCode}-{environment}-fw".ToUpper();
+            string azure_firewalls_puplic_ip_name = $"CS-{clientCode}-{environment}-fw-ip".ToLower();
 
             log.LogInformation($"resourceGroupName: {resourceGroupName}");
             log.LogInformation($"nsgName: {nsgName}");
@@ -146,6 +147,7 @@ namespace LabsProvisioning
                 firewall = _azure.NetworkSecurityGroups.GetByResourceGroup(resourceGroupName, nsgName);
                 if (firewall == null)
                 {
+                    templateParameterObjectFirewall.SelectToken("parameters.azure_firewalls_puplic_ip_name")["defaultValue"] = azure_firewalls_puplic_ip_name;
                     templateParameterObjectFirewall.SelectToken("parameters.virtualnetwork_name")["defaultValue"] = vNetName;
                     templateParameterObjectFirewall.SelectToken("parameters.routetables_firewall_route_name")["defaultValue"] = firewallRouteName;
                     templateParameterObjectFirewall.SelectToken("parameters.azure_firewalls_name")["defaultValue"] = firewallName;

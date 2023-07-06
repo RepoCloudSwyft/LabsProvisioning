@@ -22,6 +22,9 @@
         "azure_firewalls_name": {
             "type": "string"
         },
+        "azure_firewalls_puplic_ip_name": {
+            "type": "string"
+        },
         "rules": {
             "defaultValue": [
                 {
@@ -45,27 +48,27 @@
                     ],
                     "sourceIpGroups": []
                 },
-                {
-                    "name": "Allow-Youtube",
-                    "protocols": [
-                        {
-                            "protocolType": "Http",
-                            "port": 80
-                        },
-                        {
-                            "protocolType": "Https",
-                            "port": 443
-                        }
-                    ],
-                    "fqdnTags": [],
-                    "targetFqdns": [
-                        "*.youtube.com"
-                    ],
-                    "sourceAddresses": [
-                        "10.0.2.0/24"
-                    ],
-                    "sourceIpGroups": []
-                }
+              {
+                "name": "Allow-githubusercontent",
+                "protocols": [
+                  {
+                    "protocolType": "Http",
+                    "port": 80
+                  },
+                  {
+                    "protocolType": "Https",
+                    "port": 443
+                  }
+                ],
+                "fqdnTags": [],
+                "targetFqdns": [
+                  "raw.githubusercontent.com"
+                ],
+                "sourceAddresses": [
+                  "10.0.2.0/24"
+                ],
+                "sourceIpGroups": []
+              }
             ],
             "type": "array",
             "metadata": {
@@ -76,9 +79,8 @@
     },
     "variables": {
         "azure_firewall_subnet_name": "AzureFirewallSubnet",
-        "workload_subnet_name": "Workload-SN",
-        "route_name": "fw-dg",
-        "publicIPAddresses_fw_pip_name": "fw-pip"
+        "workload_subnet_name": "default",
+        "route_name": "fw-dg"
     },
     "resources": [
         {
@@ -360,7 +362,7 @@
         {
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2022-11-01",
-            "name": "[variables('publicIPAddresses_fw_pip_name')]",
+            "name": "[parameters('azure_firewalls_puplic_ip_name')]",
             "location": "[parameters('location')]",
             "sku": {
                 "name": "Standard",
@@ -371,7 +373,7 @@
                 "publicIPAllocationMethod": "Static",
                 "idleTimeoutInMinutes": 4,
                 "dnsSettings": {
-                    "domainNameLabel": "[variables('publicIPAddresses_fw_pip_name')]"
+                    "domainNameLabel": "[parameters('azure_firewalls_puplic_ip_name')]"
                 },
                 "ipTags": [],
                 "ddosSettings": {
@@ -385,7 +387,7 @@
             "name": "[parameters('azure_firewalls_name')]",
             "location": "[parameters('location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddresses_fw_pip_name'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('azure_firewalls_puplic_ip_name'))]",
                 "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), variables('azure_firewall_subnet_name'))]"
             ],
             "properties": {
@@ -397,11 +399,11 @@
                 "additionalProperties": {},
                 "ipConfigurations": [
                     {
-                        "name": "fw-pip",
-                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/azureFirewallIpConfigurations/fw-pip')]",
+                        "name": "[parameters('azure_firewalls_puplic_ip_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/azureFirewalls', parameters('azure_firewalls_name')), '/azureFirewallIpConfigurations/', parameters('azure_firewalls_puplic_ip_name'))]",
                         "properties": {
                             "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddresses_fw_pip_name'))]"
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('azure_firewalls_puplic_ip_name'))]"
                             },
                             "subnet": {
                                 "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualnetwork_name'), 'AzureFirewallSubnet')]"
@@ -477,7 +479,7 @@
                                     ],
                                     "sourceIpGroups": [],
                                     "destinationAddresses": [
-                                        "[reference(variables('publicIPAddresses_fw_pip_name')).IpAddress]"
+                                        "[reference(parameters('azure_firewalls_puplic_ip_name')).IpAddress]"
                                     ],
                                     "destinationPorts": [
                                         "3389"
@@ -493,7 +495,7 @@
     "outputs": {
         "public_ip": {
             "type": "string",
-            "value": "[reference(variables('publicIPAddresses_fw_pip_name')).IpAddress]"
+            "value": "[reference(parameters('azure_firewalls_puplic_ip_name')).IpAddress]"
         }
     }
 
