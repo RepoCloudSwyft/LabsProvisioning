@@ -363,7 +363,7 @@ namespace LabsProvisioning
             }
         }
 
-        public static async Task<string> SetResourceGroupAsync(NewTenantModel newTenantModel, ILogger log, IAzure _azure, AzureCredentials credentials, string subscriptionId, string location, string environment, string clientCode, string contactPerson, int maxRgLimit = 50, int maxResources = 15)
+        public static async Task<string> SetResourceGroupAsync(NewTenantModel newTenantModel, ILogger log, IAzure _azure, AzureCredentials credentials, string subscriptionId, string location, string environment, string clientCode, string contactPerson, int maxRgLimit = 50, int maxResources = 380)
         {
             IDictionary<string, string> rgTags = new Dictionary<string, string>();
 

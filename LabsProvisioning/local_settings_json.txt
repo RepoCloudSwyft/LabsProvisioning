@@ -1,0 +1,22 @@
+﻿{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+        "DAILY_REPORT_CRON_TIME": "0 0 1 * * *",
+        "CRON_TIME": "0 0 0,3 * * *",
+        "WEBSITE_TIME_ZONE": "Singapore Standard Time",
+        "CreateEnvironmentVariablesPsUrl": "https://raw.githubusercontent.com/onecliquezone/create-sysenv/main/create-environment-variables-windows.ps1",
+        "SendGridKey": "SendGridKey",
+        "SendGridName": "SendGridName",
+        "TO": [
+            "email@cloudswyft.com"
+        ],
+        "CC": [
+            "email@cloudswyft.com",
+            "j-patrick@cloudswyft.com"
+        ],
+        "FROM": "no-reply@cloudswyft.com",
+        "FROM_DAILYREPORT_EMAIL": "dailyreport@cloudswyft.com"
+    }
+}
