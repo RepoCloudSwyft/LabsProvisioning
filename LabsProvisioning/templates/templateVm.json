@@ -41,7 +41,7 @@
       "type": "String"
     },
     "adminPassword": {
-      "defaultValue": "cloudswfytonline@12321234",
+      "defaultValue": "PatrickWasHere!",
       "type": "SecureString"
     },
     "patchMode": {
