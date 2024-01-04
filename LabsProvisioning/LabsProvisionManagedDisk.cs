@@ -216,7 +216,7 @@ namespace LabsProvisioning
                                 template = new StreamReader(stream);
                                 reader = new JsonTextReader(template);
                                 templateParameterObjectVirtualMachine = (JObject)JToken.ReadFrom(reader);
-                                templateParameterObjectVirtualMachine.SelectToken("parameters.imageReferenceId")["defaultValue"] = imageReferenceId;
+                                templateParameterObjectVirtualMachine.SelectToken("parameters.imageReference")["defaultValue"] = imageReferenceId;
                                 templateParameterObjectVirtualMachine.SelectToken("parameters.osDiskSizeGiB")["defaultValue"] = tempStorageSizeInGb;
                             }
                             else 
